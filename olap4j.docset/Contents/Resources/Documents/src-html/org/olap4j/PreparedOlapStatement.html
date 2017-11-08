@@ -1,0 +1,204 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en">
+<head>
+<title>Source code</title>
+<link rel="stylesheet" type="text/css" href="../../../stylesheet.css" title="Style">
+</head>
+<body>
+<div class="sourceContainer">
+<pre><span class="sourceLineNo">001</span>/*<a name="line.1"></a>
+<span class="sourceLineNo">002</span>// Licensed to Julian Hyde under one or more contributor license<a name="line.2"></a>
+<span class="sourceLineNo">003</span>// agreements. See the NOTICE file distributed with this work for<a name="line.3"></a>
+<span class="sourceLineNo">004</span>// additional information regarding copyright ownership.<a name="line.4"></a>
+<span class="sourceLineNo">005</span>//<a name="line.5"></a>
+<span class="sourceLineNo">006</span>// Julian Hyde licenses this file to you under the Apache License,<a name="line.6"></a>
+<span class="sourceLineNo">007</span>// Version 2.0 (the "License"); you may not use this file except in<a name="line.7"></a>
+<span class="sourceLineNo">008</span>// compliance with the License. You may obtain a copy of the License at:<a name="line.8"></a>
+<span class="sourceLineNo">009</span>//<a name="line.9"></a>
+<span class="sourceLineNo">010</span>// http://www.apache.org/licenses/LICENSE-2.0<a name="line.10"></a>
+<span class="sourceLineNo">011</span>//<a name="line.11"></a>
+<span class="sourceLineNo">012</span>// Unless required by applicable law or agreed to in writing, software<a name="line.12"></a>
+<span class="sourceLineNo">013</span>// distributed under the License is distributed on an "AS IS" BASIS,<a name="line.13"></a>
+<span class="sourceLineNo">014</span>// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.<a name="line.14"></a>
+<span class="sourceLineNo">015</span>// See the License for the specific language governing permissions and<a name="line.15"></a>
+<span class="sourceLineNo">016</span>// limitations under the License.<a name="line.16"></a>
+<span class="sourceLineNo">017</span>*/<a name="line.17"></a>
+<span class="sourceLineNo">018</span>package org.olap4j;<a name="line.18"></a>
+<span class="sourceLineNo">019</span><a name="line.19"></a>
+<span class="sourceLineNo">020</span>import org.olap4j.metadata.Cube;<a name="line.20"></a>
+<span class="sourceLineNo">021</span><a name="line.21"></a>
+<span class="sourceLineNo">022</span>import java.sql.PreparedStatement;<a name="line.22"></a>
+<span class="sourceLineNo">023</span>import java.sql.SQLException;<a name="line.23"></a>
+<span class="sourceLineNo">024</span><a name="line.24"></a>
+<span class="sourceLineNo">025</span>/**<a name="line.25"></a>
+<span class="sourceLineNo">026</span> * An object that represents a precompiled OLAP statement.<a name="line.26"></a>
+<span class="sourceLineNo">027</span> *<a name="line.27"></a>
+<span class="sourceLineNo">028</span> * &lt;p&gt;An OLAP statement is precompiled and stored in a<a name="line.28"></a>
+<span class="sourceLineNo">029</span> * &lt;code&gt;PreparedOlapStatement&lt;/code&gt; object. This object can then be used to<a name="line.29"></a>
+<span class="sourceLineNo">030</span> * efficiently execute this statement multiple times.&lt;/p&gt;<a name="line.30"></a>
+<span class="sourceLineNo">031</span> *<a name="line.31"></a>
+<span class="sourceLineNo">032</span> * &lt;p&gt;A &lt;code&gt;PreparedOlapStatement&lt;/code&gt; is generally created using<a name="line.32"></a>
+<span class="sourceLineNo">033</span> * {@link OlapConnection#prepareOlapStatement(String)}.&lt;/p&gt;<a name="line.33"></a>
+<span class="sourceLineNo">034</span> *<a name="line.34"></a>
+<span class="sourceLineNo">035</span> * &lt;p&gt;&lt;B&gt;Note:&lt;/B&gt; The setter methods (&lt;code&gt;setShort&lt;/code&gt;,<a name="line.35"></a>
+<span class="sourceLineNo">036</span> * &lt;code&gt;setString&lt;/code&gt;, and so on) for setting IN parameter values<a name="line.36"></a>
+<span class="sourceLineNo">037</span> * must specify types that are compatible with the defined type of<a name="line.37"></a>
+<span class="sourceLineNo">038</span> * the input parameter. For instance, if the IN parameter has type<a name="line.38"></a>
+<span class="sourceLineNo">039</span> * &lt;code&gt;INTEGER&lt;/code&gt;, then the method &lt;code&gt;setInt&lt;/code&gt; should be used.&lt;/p&gt;<a name="line.39"></a>
+<span class="sourceLineNo">040</span> *<a name="line.40"></a>
+<span class="sourceLineNo">041</span> * &lt;p&gt;If a parameter has Member type, use the {@link #setObject(int, Object)}<a name="line.41"></a>
+<span class="sourceLineNo">042</span> * method to set it. A {@link OlapException} will be thrown if the object is not<a name="line.42"></a>
+<span class="sourceLineNo">043</span> * an instance of {@link org.olap4j.metadata.Member} or does not belong to the<a name="line.43"></a>
+<span class="sourceLineNo">044</span> * correct {@link org.olap4j.metadata.Hierarchy}.&lt;/p&gt;<a name="line.44"></a>
+<span class="sourceLineNo">045</span> *<a name="line.45"></a>
+<span class="sourceLineNo">046</span> * &lt;p&gt;The method {@link #getParameterMetaData()} returns a description of the<a name="line.46"></a>
+<span class="sourceLineNo">047</span> * parameters, as in JDBC. The result is an {@link OlapParameterMetaData}.<a name="line.47"></a>
+<span class="sourceLineNo">048</span> *<a name="line.48"></a>
+<span class="sourceLineNo">049</span> * &lt;p&gt;Unlike JDBC, it is not necessary to assign a value to every parameter.<a name="line.49"></a>
+<span class="sourceLineNo">050</span> * This is because OLAP parameters have a default value. Parameters have their<a name="line.50"></a>
+<span class="sourceLineNo">051</span> * default value until they are set, and then retain their new values for each<a name="line.51"></a>
+<span class="sourceLineNo">052</span> * subsequent execution of this &lt;code&gt;PreparedOlapStatement&lt;/code&gt;.<a name="line.52"></a>
+<span class="sourceLineNo">053</span> *<a name="line.53"></a>
+<span class="sourceLineNo">054</span> * @see OlapConnection#prepareOlapStatement(String)<a name="line.54"></a>
+<span class="sourceLineNo">055</span> * @see CellSet<a name="line.55"></a>
+<span class="sourceLineNo">056</span>*<a name="line.56"></a>
+<span class="sourceLineNo">057</span> * @author jhyde<a name="line.57"></a>
+<span class="sourceLineNo">058</span> * @since Aug 22, 2006<a name="line.58"></a>
+<span class="sourceLineNo">059</span> */<a name="line.59"></a>
+<span class="sourceLineNo">060</span>public interface PreparedOlapStatement<a name="line.60"></a>
+<span class="sourceLineNo">061</span>    extends PreparedStatement, OlapStatement<a name="line.61"></a>
+<span class="sourceLineNo">062</span>{<a name="line.62"></a>
+<span class="sourceLineNo">063</span>    /**<a name="line.63"></a>
+<span class="sourceLineNo">064</span>     * Executes the MDX query in this &lt;code&gt;PreparedOlapStatement&lt;/code&gt; object<a name="line.64"></a>
+<span class="sourceLineNo">065</span>     * and returns the &lt;code&gt;CellSet&lt;/code&gt; object generated by the query.<a name="line.65"></a>
+<span class="sourceLineNo">066</span>     *<a name="line.66"></a>
+<span class="sourceLineNo">067</span>     * @return an &lt;code&gt;CellSet&lt;/code&gt; object that contains the data produced<a name="line.67"></a>
+<span class="sourceLineNo">068</span>     *         by the query; never &lt;code&gt;null&lt;/code&gt;<a name="line.68"></a>
+<span class="sourceLineNo">069</span>     * @exception OlapException if a database access error occurs<a name="line.69"></a>
+<span class="sourceLineNo">070</span>     */<a name="line.70"></a>
+<span class="sourceLineNo">071</span>    CellSet executeQuery()  throws OlapException;<a name="line.71"></a>
+<span class="sourceLineNo">072</span><a name="line.72"></a>
+<span class="sourceLineNo">073</span>    /**<a name="line.73"></a>
+<span class="sourceLineNo">074</span>     * Retrieves the number, types and properties of this<a name="line.74"></a>
+<span class="sourceLineNo">075</span>     * &lt;code&gt;PreparedOlapStatement&lt;/code&gt; object's parameters.<a name="line.75"></a>
+<span class="sourceLineNo">076</span>     *<a name="line.76"></a>
+<span class="sourceLineNo">077</span>     * @return an &lt;code&gt;OlapParameterMetaData&lt;/code&gt; object that contains<a name="line.77"></a>
+<span class="sourceLineNo">078</span>     *         information about the number, types and properties of this<a name="line.78"></a>
+<span class="sourceLineNo">079</span>     *         &lt;code&gt;PreparedOlapStatement&lt;/code&gt; object's parameters<a name="line.79"></a>
+<span class="sourceLineNo">080</span>     * @exception OlapException if a database access error occurs<a name="line.80"></a>
+<span class="sourceLineNo">081</span>     * @see OlapParameterMetaData<a name="line.81"></a>
+<span class="sourceLineNo">082</span>     */<a name="line.82"></a>
+<span class="sourceLineNo">083</span>    OlapParameterMetaData getParameterMetaData() throws OlapException;<a name="line.83"></a>
+<span class="sourceLineNo">084</span><a name="line.84"></a>
+<span class="sourceLineNo">085</span>    /**<a name="line.85"></a>
+<span class="sourceLineNo">086</span>     * Retrieves a &lt;code&gt;CellSetMetaData&lt;/code&gt; object that contains<a name="line.86"></a>
+<span class="sourceLineNo">087</span>     * information about the axes and cells of the &lt;code&gt;CellSet&lt;/code&gt; object<a name="line.87"></a>
+<span class="sourceLineNo">088</span>     * that will be returned when this &lt;code&gt;PreparedOlapStatement&lt;/code&gt; object<a name="line.88"></a>
+<span class="sourceLineNo">089</span>     * is executed.<a name="line.89"></a>
+<span class="sourceLineNo">090</span>     *<a name="line.90"></a>
+<span class="sourceLineNo">091</span>     * @return the description of this &lt;code&gt;CellSet&lt;/code&gt;'s axes<a name="line.91"></a>
+<span class="sourceLineNo">092</span>     * and cells<a name="line.92"></a>
+<span class="sourceLineNo">093</span>     * @exception OlapException if a database access error occurs<a name="line.93"></a>
+<span class="sourceLineNo">094</span>     */<a name="line.94"></a>
+<span class="sourceLineNo">095</span>    CellSetMetaData getMetaData() throws SQLException;<a name="line.95"></a>
+<span class="sourceLineNo">096</span><a name="line.96"></a>
+<span class="sourceLineNo">097</span>    /**<a name="line.97"></a>
+<span class="sourceLineNo">098</span>     * Returns the cube (or virtual cube) which this statement is based upon.<a name="line.98"></a>
+<span class="sourceLineNo">099</span>     *<a name="line.99"></a>
+<span class="sourceLineNo">100</span>     * @return cube this statement is based upon<a name="line.100"></a>
+<span class="sourceLineNo">101</span>     */<a name="line.101"></a>
+<span class="sourceLineNo">102</span>    Cube getCube();<a name="line.102"></a>
+<span class="sourceLineNo">103</span><a name="line.103"></a>
+<span class="sourceLineNo">104</span>    /**<a name="line.104"></a>
+<span class="sourceLineNo">105</span>     * Returns whether the value of the designated parameter is set.<a name="line.105"></a>
+<span class="sourceLineNo">106</span>     *<a name="line.106"></a>
+<span class="sourceLineNo">107</span>     * &lt;p&gt;Note that you cannot tell whether the parameter is set by looking to<a name="line.107"></a>
+<span class="sourceLineNo">108</span>     * see whether the value is {@code null}, because {@code null} is a valid<a name="line.108"></a>
+<span class="sourceLineNo">109</span>     * parameter value. When a parameter is not set, its value is derived by<a name="line.109"></a>
+<span class="sourceLineNo">110</span>     * evaluating its default expression.<a name="line.110"></a>
+<span class="sourceLineNo">111</span>     *<a name="line.111"></a>
+<span class="sourceLineNo">112</span>     * &lt;p&gt;To set the value call one of the {@link #setObject setXxx} methods. To<a name="line.112"></a>
+<span class="sourceLineNo">113</span>     * unset the value, call {@link #unset}.<a name="line.113"></a>
+<span class="sourceLineNo">114</span>     *<a name="line.114"></a>
+<span class="sourceLineNo">115</span>     * @param parameterIndex the first parameter is 1, the second is 2, ...<a name="line.115"></a>
+<span class="sourceLineNo">116</span>     * @return whether the parameter's value has been set<a name="line.116"></a>
+<span class="sourceLineNo">117</span>     * @exception java.sql.SQLException if a database access error occurs<a name="line.117"></a>
+<span class="sourceLineNo">118</span>     */<a name="line.118"></a>
+<span class="sourceLineNo">119</span>    boolean isSet(int parameterIndex) throws SQLException;<a name="line.119"></a>
+<span class="sourceLineNo">120</span><a name="line.120"></a>
+<span class="sourceLineNo">121</span>    /**<a name="line.121"></a>
+<span class="sourceLineNo">122</span>     * Unsets the value of the designated parameter.<a name="line.122"></a>
+<span class="sourceLineNo">123</span>     *<a name="line.123"></a>
+<span class="sourceLineNo">124</span>     * @see #isSet(int)<a name="line.124"></a>
+<span class="sourceLineNo">125</span>     *<a name="line.125"></a>
+<span class="sourceLineNo">126</span>     * @param parameterIndex the first parameter is 1, the second is 2, ...<a name="line.126"></a>
+<span class="sourceLineNo">127</span>     * @exception java.sql.SQLException if a database access error occurs<a name="line.127"></a>
+<span class="sourceLineNo">128</span>     */<a name="line.128"></a>
+<span class="sourceLineNo">129</span>    void unset(int parameterIndex) throws SQLException;<a name="line.129"></a>
+<span class="sourceLineNo">130</span>}<a name="line.130"></a>
+<span class="sourceLineNo">131</span><a name="line.131"></a>
+<span class="sourceLineNo">132</span>// End PreparedOlapStatement.java<a name="line.132"></a>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre>
+</div>
+</body>
+</html>

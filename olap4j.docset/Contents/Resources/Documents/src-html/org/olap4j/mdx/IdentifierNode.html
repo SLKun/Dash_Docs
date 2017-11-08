@@ -1,0 +1,379 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en">
+<head>
+<title>Source code</title>
+<link rel="stylesheet" type="text/css" href="../../../../stylesheet.css" title="Style">
+</head>
+<body>
+<div class="sourceContainer">
+<pre><span class="sourceLineNo">001</span>/*<a name="line.1"></a>
+<span class="sourceLineNo">002</span>// Licensed to Julian Hyde under one or more contributor license<a name="line.2"></a>
+<span class="sourceLineNo">003</span>// agreements. See the NOTICE file distributed with this work for<a name="line.3"></a>
+<span class="sourceLineNo">004</span>// additional information regarding copyright ownership.<a name="line.4"></a>
+<span class="sourceLineNo">005</span>//<a name="line.5"></a>
+<span class="sourceLineNo">006</span>// Julian Hyde licenses this file to you under the Apache License,<a name="line.6"></a>
+<span class="sourceLineNo">007</span>// Version 2.0 (the "License"); you may not use this file except in<a name="line.7"></a>
+<span class="sourceLineNo">008</span>// compliance with the License. You may obtain a copy of the License at:<a name="line.8"></a>
+<span class="sourceLineNo">009</span>//<a name="line.9"></a>
+<span class="sourceLineNo">010</span>// http://www.apache.org/licenses/LICENSE-2.0<a name="line.10"></a>
+<span class="sourceLineNo">011</span>//<a name="line.11"></a>
+<span class="sourceLineNo">012</span>// Unless required by applicable law or agreed to in writing, software<a name="line.12"></a>
+<span class="sourceLineNo">013</span>// distributed under the License is distributed on an "AS IS" BASIS,<a name="line.13"></a>
+<span class="sourceLineNo">014</span>// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.<a name="line.14"></a>
+<span class="sourceLineNo">015</span>// See the License for the specific language governing permissions and<a name="line.15"></a>
+<span class="sourceLineNo">016</span>// limitations under the License.<a name="line.16"></a>
+<span class="sourceLineNo">017</span>*/<a name="line.17"></a>
+<span class="sourceLineNo">018</span>package org.olap4j.mdx;<a name="line.18"></a>
+<span class="sourceLineNo">019</span><a name="line.19"></a>
+<span class="sourceLineNo">020</span>import org.olap4j.impl.*;<a name="line.20"></a>
+<span class="sourceLineNo">021</span>import org.olap4j.type.Type;<a name="line.21"></a>
+<span class="sourceLineNo">022</span><a name="line.22"></a>
+<span class="sourceLineNo">023</span>import java.util.*;<a name="line.23"></a>
+<span class="sourceLineNo">024</span><a name="line.24"></a>
+<span class="sourceLineNo">025</span>/**<a name="line.25"></a>
+<span class="sourceLineNo">026</span> * Multi-part identifier.<a name="line.26"></a>
+<span class="sourceLineNo">027</span> *<a name="line.27"></a>
+<span class="sourceLineNo">028</span> * &lt;p&gt;An identifier is immutable.<a name="line.28"></a>
+<span class="sourceLineNo">029</span> *<a name="line.29"></a>
+<span class="sourceLineNo">030</span> * &lt;p&gt;An identifer consists of one or more {@link IdentifierSegment}s. A segment<a name="line.30"></a>
+<span class="sourceLineNo">031</span> * is either:&lt;ul&gt;<a name="line.31"></a>
+<span class="sourceLineNo">032</span> * &lt;li&gt;An unquoted value such as '{@code CA}',<a name="line.32"></a>
+<span class="sourceLineNo">033</span> * &lt;li&gt;A value quoted in brackets, such as '{@code [San Francisco]}', or<a name="line.33"></a>
+<span class="sourceLineNo">034</span> * &lt;li&gt;A key of one or more parts, each of which is prefixed with '&amp;amp;',<a name="line.34"></a>
+<span class="sourceLineNo">035</span> *     such as '{@code &amp;amp;[Key 1]&amp;amp;Key2&amp;amp;[5]}'.<a name="line.35"></a>
+<span class="sourceLineNo">036</span> * &lt;/ul&gt;<a name="line.36"></a>
+<span class="sourceLineNo">037</span> *<a name="line.37"></a>
+<span class="sourceLineNo">038</span> * &lt;p&gt;Segment types are indicated by the {@link Quoting} enumeration.<a name="line.38"></a>
+<span class="sourceLineNo">039</span> *<a name="line.39"></a>
+<span class="sourceLineNo">040</span> * &lt;p&gt;A key segment is of type {@link Quoting#KEY}, and has one or more<a name="line.40"></a>
+<span class="sourceLineNo">041</span> * component parts accessed via the<a name="line.41"></a>
+<span class="sourceLineNo">042</span> * {@link IdentifierSegment#getKeyParts()} method. The parts<a name="line.42"></a>
+<span class="sourceLineNo">043</span> * are of type {@link Quoting#UNQUOTED} or {@link Quoting#QUOTED}.<a name="line.43"></a>
+<span class="sourceLineNo">044</span> *<a name="line.44"></a>
+<span class="sourceLineNo">045</span> * &lt;p&gt;A simple example is the identifier {@code Measures.[Unit Sales]}. It<a name="line.45"></a>
+<span class="sourceLineNo">046</span> * has two segments:&lt;ul&gt;<a name="line.46"></a>
+<span class="sourceLineNo">047</span> * &lt;li&gt;Segment #0 is<a name="line.47"></a>
+<span class="sourceLineNo">048</span> *     {@link Quoting#UNQUOTED UNQUOTED},<a name="line.48"></a>
+<span class="sourceLineNo">049</span> *     name "Measures"&lt;/li&gt;<a name="line.49"></a>
+<span class="sourceLineNo">050</span> * &lt;li&gt;Segment #1 is<a name="line.50"></a>
+<span class="sourceLineNo">051</span> *     {@link Quoting#QUOTED QUOTED},<a name="line.51"></a>
+<span class="sourceLineNo">052</span> *     name "Unit Sales"&lt;/li&gt;<a name="line.52"></a>
+<span class="sourceLineNo">053</span> * &lt;/ul&gt;<a name="line.53"></a>
+<span class="sourceLineNo">054</span> *<a name="line.54"></a>
+<span class="sourceLineNo">055</span> * &lt;p&gt;A more complex example illustrates a compound key. The identifier {@code<a name="line.55"></a>
+<span class="sourceLineNo">056</span> * [Customers].[City].&amp;amp;[San Francisco]&amp;amp;CA&amp;amp;USA.&amp;amp;[cust1234]}<a name="line.56"></a>
+<span class="sourceLineNo">057</span> * contains four segments as follows:<a name="line.57"></a>
+<span class="sourceLineNo">058</span> * &lt;ul&gt;<a name="line.58"></a>
+<span class="sourceLineNo">059</span> * &lt;li&gt;Segment #0 is QUOTED, name "Customers"&lt;/li&gt;<a name="line.59"></a>
+<span class="sourceLineNo">060</span> * &lt;li&gt;Segment #1 is QUOTED, name "City"&lt;/li&gt;<a name="line.60"></a>
+<span class="sourceLineNo">061</span> * &lt;li&gt;Segment #2 is a {@link Quoting#KEY KEY}.<a name="line.61"></a>
+<span class="sourceLineNo">062</span> *     It has 3 sub-segments:<a name="line.62"></a>
+<span class="sourceLineNo">063</span> *     &lt;ul&gt;<a name="line.63"></a>
+<span class="sourceLineNo">064</span> *     &lt;li&gt;Sub-segment #0 is QUOTED, name "San Francisco"&lt;/li&gt;<a name="line.64"></a>
+<span class="sourceLineNo">065</span> *     &lt;li&gt;Sub-segment #1 is UNQUOTED, name "CA"&lt;/li&gt;<a name="line.65"></a>
+<span class="sourceLineNo">066</span> *     &lt;li&gt;Sub-segment #2 is UNQUOTED, name "USA"&lt;/li&gt;<a name="line.66"></a>
+<span class="sourceLineNo">067</span> *     &lt;/ul&gt;<a name="line.67"></a>
+<span class="sourceLineNo">068</span> * &lt;/li&gt;<a name="line.68"></a>
+<span class="sourceLineNo">069</span> * &lt;li&gt;Segment #3 is a KEY. It has 1 sub-segment:<a name="line.69"></a>
+<span class="sourceLineNo">070</span> *     &lt;ul&gt;<a name="line.70"></a>
+<span class="sourceLineNo">071</span> *     &lt;li&gt;Sub-segment #0 is QUOTED, name "cust1234"&lt;/li&gt;<a name="line.71"></a>
+<span class="sourceLineNo">072</span> *     &lt;/ul&gt;<a name="line.72"></a>
+<span class="sourceLineNo">073</span> * &lt;/li&gt;<a name="line.73"></a>
+<span class="sourceLineNo">074</span> * &lt;/ul&gt;<a name="line.74"></a>
+<span class="sourceLineNo">075</span> *<a name="line.75"></a>
+<span class="sourceLineNo">076</span> * @author jhyde<a name="line.76"></a>
+<span class="sourceLineNo">077</span> */<a name="line.77"></a>
+<span class="sourceLineNo">078</span>public class IdentifierNode<a name="line.78"></a>
+<span class="sourceLineNo">079</span>    implements ParseTreeNode<a name="line.79"></a>
+<span class="sourceLineNo">080</span>{<a name="line.80"></a>
+<span class="sourceLineNo">081</span>    private final List&lt;IdentifierSegment&gt; segments;<a name="line.81"></a>
+<span class="sourceLineNo">082</span><a name="line.82"></a>
+<span class="sourceLineNo">083</span>    /**<a name="line.83"></a>
+<span class="sourceLineNo">084</span>     * Creates an identifier containing one or more segments.<a name="line.84"></a>
+<span class="sourceLineNo">085</span>     *<a name="line.85"></a>
+<span class="sourceLineNo">086</span>     * @param segments Array of Segments, each consisting of a name and quoting<a name="line.86"></a>
+<span class="sourceLineNo">087</span>     * style<a name="line.87"></a>
+<span class="sourceLineNo">088</span>     */<a name="line.88"></a>
+<span class="sourceLineNo">089</span>    public IdentifierNode(IdentifierSegment... segments) {<a name="line.89"></a>
+<span class="sourceLineNo">090</span>        if (segments.length &lt; 1) {<a name="line.90"></a>
+<span class="sourceLineNo">091</span>            throw new IllegalArgumentException();<a name="line.91"></a>
+<span class="sourceLineNo">092</span>        }<a name="line.92"></a>
+<span class="sourceLineNo">093</span>        this.segments = UnmodifiableArrayList.asCopyOf(segments);<a name="line.93"></a>
+<span class="sourceLineNo">094</span>    }<a name="line.94"></a>
+<span class="sourceLineNo">095</span><a name="line.95"></a>
+<span class="sourceLineNo">096</span>    /**<a name="line.96"></a>
+<span class="sourceLineNo">097</span>     * Creates an identifier containing a list of segments.<a name="line.97"></a>
+<span class="sourceLineNo">098</span>     *<a name="line.98"></a>
+<span class="sourceLineNo">099</span>     * @param segments List of segments<a name="line.99"></a>
+<span class="sourceLineNo">100</span>     */<a name="line.100"></a>
+<span class="sourceLineNo">101</span>    public IdentifierNode(List&lt;IdentifierSegment&gt; segments) {<a name="line.101"></a>
+<span class="sourceLineNo">102</span>        if (segments.size() &lt; 1) {<a name="line.102"></a>
+<span class="sourceLineNo">103</span>            throw new IllegalArgumentException();<a name="line.103"></a>
+<span class="sourceLineNo">104</span>        }<a name="line.104"></a>
+<span class="sourceLineNo">105</span>        this.segments =<a name="line.105"></a>
+<span class="sourceLineNo">106</span>            new UnmodifiableArrayList&lt;IdentifierSegment&gt;(<a name="line.106"></a>
+<span class="sourceLineNo">107</span>                segments.toArray(<a name="line.107"></a>
+<span class="sourceLineNo">108</span>                    new IdentifierSegment[segments.size()]));<a name="line.108"></a>
+<span class="sourceLineNo">109</span>    }<a name="line.109"></a>
+<span class="sourceLineNo">110</span><a name="line.110"></a>
+<span class="sourceLineNo">111</span>    public Type getType() {<a name="line.111"></a>
+<span class="sourceLineNo">112</span>        // Can't give the type until we have resolved.<a name="line.112"></a>
+<span class="sourceLineNo">113</span>        throw new UnsupportedOperationException();<a name="line.113"></a>
+<span class="sourceLineNo">114</span>    }<a name="line.114"></a>
+<span class="sourceLineNo">115</span><a name="line.115"></a>
+<span class="sourceLineNo">116</span>    /**<a name="line.116"></a>
+<span class="sourceLineNo">117</span>     * Returns the list of segments which consistitute this identifier.<a name="line.117"></a>
+<span class="sourceLineNo">118</span>     *<a name="line.118"></a>
+<span class="sourceLineNo">119</span>     * @return list of constituent segments<a name="line.119"></a>
+<span class="sourceLineNo">120</span>     */<a name="line.120"></a>
+<span class="sourceLineNo">121</span>    public List&lt;IdentifierSegment&gt; getSegmentList() {<a name="line.121"></a>
+<span class="sourceLineNo">122</span>        return segments;<a name="line.122"></a>
+<span class="sourceLineNo">123</span>    }<a name="line.123"></a>
+<span class="sourceLineNo">124</span><a name="line.124"></a>
+<span class="sourceLineNo">125</span>    public ParseRegion getRegion() {<a name="line.125"></a>
+<span class="sourceLineNo">126</span>        // Region is the span from the first segment to the last.<a name="line.126"></a>
+<span class="sourceLineNo">127</span>        return sumSegmentRegions(segments);<a name="line.127"></a>
+<span class="sourceLineNo">128</span>    }<a name="line.128"></a>
+<span class="sourceLineNo">129</span><a name="line.129"></a>
+<span class="sourceLineNo">130</span>    /**<a name="line.130"></a>
+<span class="sourceLineNo">131</span>     * Returns a region encompassing the regions of the first through the last<a name="line.131"></a>
+<span class="sourceLineNo">132</span>     * of a list of segments.<a name="line.132"></a>
+<span class="sourceLineNo">133</span>     *<a name="line.133"></a>
+<span class="sourceLineNo">134</span>     * @param segments List of segments<a name="line.134"></a>
+<span class="sourceLineNo">135</span>     * @return Region encompassed by list of segments<a name="line.135"></a>
+<span class="sourceLineNo">136</span>     */<a name="line.136"></a>
+<span class="sourceLineNo">137</span>    static ParseRegion sumSegmentRegions(<a name="line.137"></a>
+<span class="sourceLineNo">138</span>        final List&lt;? extends IdentifierSegment&gt; segments)<a name="line.138"></a>
+<span class="sourceLineNo">139</span>    {<a name="line.139"></a>
+<span class="sourceLineNo">140</span>        return ParseRegion.sum(<a name="line.140"></a>
+<span class="sourceLineNo">141</span>            new AbstractList&lt;ParseRegion&gt;() {<a name="line.141"></a>
+<span class="sourceLineNo">142</span>                public ParseRegion get(int index) {<a name="line.142"></a>
+<span class="sourceLineNo">143</span>                    return segments.get(index).getRegion();<a name="line.143"></a>
+<span class="sourceLineNo">144</span>                }<a name="line.144"></a>
+<span class="sourceLineNo">145</span><a name="line.145"></a>
+<span class="sourceLineNo">146</span>                public int size() {<a name="line.146"></a>
+<span class="sourceLineNo">147</span>                    return segments.size();<a name="line.147"></a>
+<span class="sourceLineNo">148</span>                }<a name="line.148"></a>
+<span class="sourceLineNo">149</span>            });<a name="line.149"></a>
+<span class="sourceLineNo">150</span>    }<a name="line.150"></a>
+<span class="sourceLineNo">151</span><a name="line.151"></a>
+<span class="sourceLineNo">152</span>    /**<a name="line.152"></a>
+<span class="sourceLineNo">153</span>     * Returns a new Identifier consisting of this one with another segment<a name="line.153"></a>
+<span class="sourceLineNo">154</span>     * appended. Does not modify this Identifier.<a name="line.154"></a>
+<span class="sourceLineNo">155</span>     *<a name="line.155"></a>
+<span class="sourceLineNo">156</span>     * @param segment Name of segment<a name="line.156"></a>
+<span class="sourceLineNo">157</span>     * @return New identifier<a name="line.157"></a>
+<span class="sourceLineNo">158</span>     */<a name="line.158"></a>
+<span class="sourceLineNo">159</span>    public IdentifierNode append(IdentifierSegment segment) {<a name="line.159"></a>
+<span class="sourceLineNo">160</span>        List&lt;IdentifierSegment&gt; newSegments =<a name="line.160"></a>
+<span class="sourceLineNo">161</span>            new ArrayList&lt;IdentifierSegment&gt;(segments);<a name="line.161"></a>
+<span class="sourceLineNo">162</span>        newSegments.add(segment);<a name="line.162"></a>
+<span class="sourceLineNo">163</span>        return new IdentifierNode(newSegments);<a name="line.163"></a>
+<span class="sourceLineNo">164</span>    }<a name="line.164"></a>
+<span class="sourceLineNo">165</span><a name="line.165"></a>
+<span class="sourceLineNo">166</span>    public &lt;T&gt; T accept(ParseTreeVisitor&lt;T&gt; visitor) {<a name="line.166"></a>
+<span class="sourceLineNo">167</span>        return visitor.visit(this);<a name="line.167"></a>
+<span class="sourceLineNo">168</span>    }<a name="line.168"></a>
+<span class="sourceLineNo">169</span><a name="line.169"></a>
+<span class="sourceLineNo">170</span>    public void unparse(ParseTreeWriter writer) {<a name="line.170"></a>
+<span class="sourceLineNo">171</span>        writer.getPrintWriter().print(this);<a name="line.171"></a>
+<span class="sourceLineNo">172</span>    }<a name="line.172"></a>
+<span class="sourceLineNo">173</span><a name="line.173"></a>
+<span class="sourceLineNo">174</span>    public String toString() {<a name="line.174"></a>
+<span class="sourceLineNo">175</span>        return unparseIdentifierList(segments);<a name="line.175"></a>
+<span class="sourceLineNo">176</span>    }<a name="line.176"></a>
+<span class="sourceLineNo">177</span><a name="line.177"></a>
+<span class="sourceLineNo">178</span>    public IdentifierNode deepCopy() {<a name="line.178"></a>
+<span class="sourceLineNo">179</span>        // IdentifierNode is immutable<a name="line.179"></a>
+<span class="sourceLineNo">180</span>        return this;<a name="line.180"></a>
+<span class="sourceLineNo">181</span>    }<a name="line.181"></a>
+<span class="sourceLineNo">182</span><a name="line.182"></a>
+<span class="sourceLineNo">183</span>    /**<a name="line.183"></a>
+<span class="sourceLineNo">184</span>     * Parses an MDX identifier string into an<a name="line.184"></a>
+<span class="sourceLineNo">185</span>     * {@link org.olap4j.mdx.IdentifierNode}.<a name="line.185"></a>
+<span class="sourceLineNo">186</span>     *<a name="line.186"></a>
+<span class="sourceLineNo">187</span>     * &lt;p&gt;It contains a list of {@link IdentifierSegment segments}, each<a name="line.187"></a>
+<span class="sourceLineNo">188</span>     * of which is a name combined with a description of how the name<a name="line.188"></a>
+<span class="sourceLineNo">189</span>     * was {@link Quoting quoted}. For example,<a name="line.189"></a>
+<span class="sourceLineNo">190</span>     *<a name="line.190"></a>
+<span class="sourceLineNo">191</span>     * &lt;blockquote&gt;&lt;code&gt;<a name="line.191"></a>
+<span class="sourceLineNo">192</span>     * parseIdentifier(<a name="line.192"></a>
+<span class="sourceLineNo">193</span>     * "[Customers].USA.[South Dakota].[Sioux Falls].&amp;amp;[1245]")<a name="line.193"></a>
+<span class="sourceLineNo">194</span>     * &lt;/code&gt;&lt;/blockquote&gt;<a name="line.194"></a>
+<span class="sourceLineNo">195</span>     *<a name="line.195"></a>
+<span class="sourceLineNo">196</span>     * returns an IdentifierNode consisting of the following segments:<a name="line.196"></a>
+<span class="sourceLineNo">197</span>     *<a name="line.197"></a>
+<span class="sourceLineNo">198</span>     * &lt;code&gt;&lt;ul&gt;<a name="line.198"></a>
+<span class="sourceLineNo">199</span>     * &lt;li&gt;NameSegment("Customers", quoted=true),<a name="line.199"></a>
+<span class="sourceLineNo">200</span>     * &lt;li&gt;NameSegment("USA", quoted=false),<a name="line.200"></a>
+<span class="sourceLineNo">201</span>     * &lt;li&gt;NameSegment("South Dakota", quoted=true),<a name="line.201"></a>
+<span class="sourceLineNo">202</span>     * &lt;li&gt;NameSegment("Sioux Falls", quoted=true),<a name="line.202"></a>
+<span class="sourceLineNo">203</span>     * &lt;li&gt;KeySegment( { NameSegment("1245", quoted=true) } )<a name="line.203"></a>
+<span class="sourceLineNo">204</span>     * &lt;/ul&gt;&lt;/code&gt;<a name="line.204"></a>
+<span class="sourceLineNo">205</span>     *<a name="line.205"></a>
+<span class="sourceLineNo">206</span>     * @see #ofNames(String...)<a name="line.206"></a>
+<span class="sourceLineNo">207</span>     *<a name="line.207"></a>
+<span class="sourceLineNo">208</span>     * @param identifier MDX identifier string<a name="line.208"></a>
+<span class="sourceLineNo">209</span>     *<a name="line.209"></a>
+<span class="sourceLineNo">210</span>     * @return Identifier parse tree node<a name="line.210"></a>
+<span class="sourceLineNo">211</span>     *<a name="line.211"></a>
+<span class="sourceLineNo">212</span>     * @throws IllegalArgumentException if the format of the identifier is<a name="line.212"></a>
+<span class="sourceLineNo">213</span>     * invalid<a name="line.213"></a>
+<span class="sourceLineNo">214</span>     */<a name="line.214"></a>
+<span class="sourceLineNo">215</span>    public static IdentifierNode parseIdentifier(String identifier)  {<a name="line.215"></a>
+<span class="sourceLineNo">216</span>        return new IdentifierNode(IdentifierParser.parseIdentifier(identifier));<a name="line.216"></a>
+<span class="sourceLineNo">217</span>    }<a name="line.217"></a>
+<span class="sourceLineNo">218</span><a name="line.218"></a>
+<span class="sourceLineNo">219</span>    /**<a name="line.219"></a>
+<span class="sourceLineNo">220</span>     * Converts an array of quoted name segments into an identifier.<a name="line.220"></a>
+<span class="sourceLineNo">221</span>     *<a name="line.221"></a>
+<span class="sourceLineNo">222</span>     * &lt;p&gt;For example,<a name="line.222"></a>
+<span class="sourceLineNo">223</span>     *<a name="line.223"></a>
+<span class="sourceLineNo">224</span>     * &lt;blockquote&gt;&lt;code&gt;<a name="line.224"></a>
+<span class="sourceLineNo">225</span>     * IdentifierNode.ofNames("Store", "USA", "CA")&lt;/code&gt;&lt;/blockquote&gt;<a name="line.225"></a>
+<span class="sourceLineNo">226</span>     *<a name="line.226"></a>
+<span class="sourceLineNo">227</span>     * returns an IdentifierNode consisting of the following segments:<a name="line.227"></a>
+<span class="sourceLineNo">228</span>     *<a name="line.228"></a>
+<span class="sourceLineNo">229</span>     * &lt;code&gt;&lt;ul&gt;<a name="line.229"></a>
+<span class="sourceLineNo">230</span>     * &lt;li&gt;NameSegment("Customers", quoted=true),<a name="line.230"></a>
+<span class="sourceLineNo">231</span>     * &lt;li&gt;NameSegment("USA", quoted=false),<a name="line.231"></a>
+<span class="sourceLineNo">232</span>     * &lt;li&gt;NameSegment("South Dakota", quoted=true),<a name="line.232"></a>
+<span class="sourceLineNo">233</span>     * &lt;li&gt;NameSegment("Sioux Falls", quoted=true),<a name="line.233"></a>
+<span class="sourceLineNo">234</span>     * &lt;li&gt;KeySegment( { NameSegment("1245", quoted=true) } )<a name="line.234"></a>
+<span class="sourceLineNo">235</span>     * &lt;/ul&gt;&lt;/code&gt;<a name="line.235"></a>
+<span class="sourceLineNo">236</span>     *<a name="line.236"></a>
+<span class="sourceLineNo">237</span>     * @see #parseIdentifier(String)<a name="line.237"></a>
+<span class="sourceLineNo">238</span>     *<a name="line.238"></a>
+<span class="sourceLineNo">239</span>     * @param names Array of names<a name="line.239"></a>
+<span class="sourceLineNo">240</span>     *<a name="line.240"></a>
+<span class="sourceLineNo">241</span>     * @return Identifier parse tree node<a name="line.241"></a>
+<span class="sourceLineNo">242</span>     */<a name="line.242"></a>
+<span class="sourceLineNo">243</span>    public static IdentifierNode ofNames(String... names) {<a name="line.243"></a>
+<span class="sourceLineNo">244</span>        final List&lt;IdentifierSegment&gt; list =<a name="line.244"></a>
+<span class="sourceLineNo">245</span>            new ArrayList&lt;IdentifierSegment&gt;();<a name="line.245"></a>
+<span class="sourceLineNo">246</span>        for (String name : names) {<a name="line.246"></a>
+<span class="sourceLineNo">247</span>            list.add(new NameSegment(null, name, Quoting.QUOTED));<a name="line.247"></a>
+<span class="sourceLineNo">248</span>        }<a name="line.248"></a>
+<span class="sourceLineNo">249</span>        return new IdentifierNode(list);<a name="line.249"></a>
+<span class="sourceLineNo">250</span>    }<a name="line.250"></a>
+<span class="sourceLineNo">251</span><a name="line.251"></a>
+<span class="sourceLineNo">252</span>    /**<a name="line.252"></a>
+<span class="sourceLineNo">253</span>     * Returns string quoted in [...].<a name="line.253"></a>
+<span class="sourceLineNo">254</span>     *<a name="line.254"></a>
+<span class="sourceLineNo">255</span>     * &lt;p&gt;For example, "San Francisco" becomes<a name="line.255"></a>
+<span class="sourceLineNo">256</span>     * "[San Francisco]"; "a [bracketed] string" becomes<a name="line.256"></a>
+<span class="sourceLineNo">257</span>     * "[a [bracketed]] string]".<a name="line.257"></a>
+<span class="sourceLineNo">258</span>     *<a name="line.258"></a>
+<span class="sourceLineNo">259</span>     * @param id Unquoted name<a name="line.259"></a>
+<span class="sourceLineNo">260</span>     * @return Quoted name<a name="line.260"></a>
+<span class="sourceLineNo">261</span>     */<a name="line.261"></a>
+<span class="sourceLineNo">262</span>    static String quoteMdxIdentifier(String id) {<a name="line.262"></a>
+<span class="sourceLineNo">263</span>        StringBuilder buf = new StringBuilder(id.length() + 20);<a name="line.263"></a>
+<span class="sourceLineNo">264</span>        quoteMdxIdentifier(id, buf);<a name="line.264"></a>
+<span class="sourceLineNo">265</span>        return buf.toString();<a name="line.265"></a>
+<span class="sourceLineNo">266</span>    }<a name="line.266"></a>
+<span class="sourceLineNo">267</span><a name="line.267"></a>
+<span class="sourceLineNo">268</span>    /**<a name="line.268"></a>
+<span class="sourceLineNo">269</span>     * Returns a string quoted in [...], writing the results to a<a name="line.269"></a>
+<span class="sourceLineNo">270</span>     * {@link StringBuilder}.<a name="line.270"></a>
+<span class="sourceLineNo">271</span>     *<a name="line.271"></a>
+<span class="sourceLineNo">272</span>     * @param id Unquoted name<a name="line.272"></a>
+<span class="sourceLineNo">273</span>     * @param buf Builder to write quoted string to<a name="line.273"></a>
+<span class="sourceLineNo">274</span>     */<a name="line.274"></a>
+<span class="sourceLineNo">275</span>    static void quoteMdxIdentifier(String id, StringBuilder buf) {<a name="line.275"></a>
+<span class="sourceLineNo">276</span>        buf.append('[');<a name="line.276"></a>
+<span class="sourceLineNo">277</span>        int start = buf.length();<a name="line.277"></a>
+<span class="sourceLineNo">278</span>        buf.append(id);<a name="line.278"></a>
+<span class="sourceLineNo">279</span>        Olap4jUtil.replace(buf, start, "]", "]]");<a name="line.279"></a>
+<span class="sourceLineNo">280</span>        buf.append(']');<a name="line.280"></a>
+<span class="sourceLineNo">281</span>    }<a name="line.281"></a>
+<span class="sourceLineNo">282</span><a name="line.282"></a>
+<span class="sourceLineNo">283</span>    /**<a name="line.283"></a>
+<span class="sourceLineNo">284</span>     * Converts a sequence of identifiers to a string.<a name="line.284"></a>
+<span class="sourceLineNo">285</span>     *<a name="line.285"></a>
+<span class="sourceLineNo">286</span>     * &lt;p&gt;For example, {"Store", "USA",<a name="line.286"></a>
+<span class="sourceLineNo">287</span>     * "California"} becomes "[Store].[USA].[California]".<a name="line.287"></a>
+<span class="sourceLineNo">288</span>     *<a name="line.288"></a>
+<span class="sourceLineNo">289</span>     * @param segments List of segments<a name="line.289"></a>
+<span class="sourceLineNo">290</span>     * @return Segments as quoted string<a name="line.290"></a>
+<span class="sourceLineNo">291</span>     */<a name="line.291"></a>
+<span class="sourceLineNo">292</span>    static String unparseIdentifierList(<a name="line.292"></a>
+<span class="sourceLineNo">293</span>        List&lt;? extends IdentifierSegment&gt; segments)<a name="line.293"></a>
+<span class="sourceLineNo">294</span>    {<a name="line.294"></a>
+<span class="sourceLineNo">295</span>        final StringBuilder buf = new StringBuilder(64);<a name="line.295"></a>
+<span class="sourceLineNo">296</span>        for (int i = 0; i &lt; segments.size(); i++) {<a name="line.296"></a>
+<span class="sourceLineNo">297</span>            IdentifierSegment segment = segments.get(i);<a name="line.297"></a>
+<span class="sourceLineNo">298</span>            if (i &gt; 0) {<a name="line.298"></a>
+<span class="sourceLineNo">299</span>                buf.append('.');<a name="line.299"></a>
+<span class="sourceLineNo">300</span>            }<a name="line.300"></a>
+<span class="sourceLineNo">301</span>            segment.toString(buf);<a name="line.301"></a>
+<span class="sourceLineNo">302</span>        }<a name="line.302"></a>
+<span class="sourceLineNo">303</span>        return buf.toString();<a name="line.303"></a>
+<span class="sourceLineNo">304</span>    }<a name="line.304"></a>
+<span class="sourceLineNo">305</span>}<a name="line.305"></a>
+<span class="sourceLineNo">306</span><a name="line.306"></a>
+<span class="sourceLineNo">307</span>// End IdentifierNode.java<a name="line.307"></a>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre>
+</div>
+</body>
+</html>

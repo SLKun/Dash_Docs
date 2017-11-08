@@ -1,0 +1,414 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en">
+<head>
+<title>Source code</title>
+<link rel="stylesheet" type="text/css" href="../../../../stylesheet.css" title="Style">
+</head>
+<body>
+<div class="sourceContainer">
+<pre><span class="sourceLineNo">001</span>/*<a name="line.1"></a>
+<span class="sourceLineNo">002</span>// Licensed to Julian Hyde under one or more contributor license<a name="line.2"></a>
+<span class="sourceLineNo">003</span>// agreements. See the NOTICE file distributed with this work for<a name="line.3"></a>
+<span class="sourceLineNo">004</span>// additional information regarding copyright ownership.<a name="line.4"></a>
+<span class="sourceLineNo">005</span>//<a name="line.5"></a>
+<span class="sourceLineNo">006</span>// Julian Hyde licenses this file to you under the Apache License,<a name="line.6"></a>
+<span class="sourceLineNo">007</span>// Version 2.0 (the "License"); you may not use this file except in<a name="line.7"></a>
+<span class="sourceLineNo">008</span>// compliance with the License. You may obtain a copy of the License at:<a name="line.8"></a>
+<span class="sourceLineNo">009</span>//<a name="line.9"></a>
+<span class="sourceLineNo">010</span>// http://www.apache.org/licenses/LICENSE-2.0<a name="line.10"></a>
+<span class="sourceLineNo">011</span>//<a name="line.11"></a>
+<span class="sourceLineNo">012</span>// Unless required by applicable law or agreed to in writing, software<a name="line.12"></a>
+<span class="sourceLineNo">013</span>// distributed under the License is distributed on an "AS IS" BASIS,<a name="line.13"></a>
+<span class="sourceLineNo">014</span>// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.<a name="line.14"></a>
+<span class="sourceLineNo">015</span>// See the License for the specific language governing permissions and<a name="line.15"></a>
+<span class="sourceLineNo">016</span>// limitations under the License.<a name="line.16"></a>
+<span class="sourceLineNo">017</span>*/<a name="line.17"></a>
+<span class="sourceLineNo">018</span>package org.olap4j.query;<a name="line.18"></a>
+<span class="sourceLineNo">019</span><a name="line.19"></a>
+<span class="sourceLineNo">020</span>import org.olap4j.*;<a name="line.20"></a>
+<span class="sourceLineNo">021</span>import org.olap4j.mdx.SelectNode;<a name="line.21"></a>
+<span class="sourceLineNo">022</span>import org.olap4j.metadata.*;<a name="line.22"></a>
+<span class="sourceLineNo">023</span><a name="line.23"></a>
+<span class="sourceLineNo">024</span>import java.sql.SQLException;<a name="line.24"></a>
+<span class="sourceLineNo">025</span>import java.util.*;<a name="line.25"></a>
+<span class="sourceLineNo">026</span>import java.util.Map.Entry;<a name="line.26"></a>
+<span class="sourceLineNo">027</span><a name="line.27"></a>
+<span class="sourceLineNo">028</span>/**<a name="line.28"></a>
+<span class="sourceLineNo">029</span> * Base query model object.<a name="line.29"></a>
+<span class="sourceLineNo">030</span> *<a name="line.30"></a>
+<span class="sourceLineNo">031</span> * @author jhyde, jdixon, Luc Boudreau<a name="line.31"></a>
+<span class="sourceLineNo">032</span> * @since May 29, 2007<a name="line.32"></a>
+<span class="sourceLineNo">033</span> */<a name="line.33"></a>
+<span class="sourceLineNo">034</span>public class Query extends QueryNodeImpl {<a name="line.34"></a>
+<span class="sourceLineNo">035</span><a name="line.35"></a>
+<span class="sourceLineNo">036</span>    protected final String name;<a name="line.36"></a>
+<span class="sourceLineNo">037</span>    protected Map&lt;Axis, QueryAxis&gt; axes = new HashMap&lt;Axis, QueryAxis&gt;();<a name="line.37"></a>
+<span class="sourceLineNo">038</span>    protected QueryAxis across;<a name="line.38"></a>
+<span class="sourceLineNo">039</span>    protected QueryAxis down;<a name="line.39"></a>
+<span class="sourceLineNo">040</span>    protected QueryAxis filter;<a name="line.40"></a>
+<span class="sourceLineNo">041</span>    protected QueryAxis unused;<a name="line.41"></a>
+<span class="sourceLineNo">042</span>    protected final Cube cube;<a name="line.42"></a>
+<span class="sourceLineNo">043</span>    protected Map&lt;String, QueryDimension&gt; dimensionMap =<a name="line.43"></a>
+<span class="sourceLineNo">044</span>        new HashMap&lt;String, QueryDimension&gt;();<a name="line.44"></a>
+<span class="sourceLineNo">045</span>    /**<a name="line.45"></a>
+<span class="sourceLineNo">046</span>     * Whether or not to select the default hierarchy and default<a name="line.46"></a>
+<span class="sourceLineNo">047</span>     * member on a dimension if no explicit selections were performed.<a name="line.47"></a>
+<span class="sourceLineNo">048</span>     */<a name="line.48"></a>
+<span class="sourceLineNo">049</span>    protected boolean selectDefaultMembers = true;<a name="line.49"></a>
+<span class="sourceLineNo">050</span>    private final OlapConnection connection;<a name="line.50"></a>
+<span class="sourceLineNo">051</span>    private final SelectionFactory selectionFactory = new SelectionFactory();<a name="line.51"></a>
+<span class="sourceLineNo">052</span><a name="line.52"></a>
+<span class="sourceLineNo">053</span>    /**<a name="line.53"></a>
+<span class="sourceLineNo">054</span>     * Constructs a Query object.<a name="line.54"></a>
+<span class="sourceLineNo">055</span>     * @param name Any arbitrary name to give to this query.<a name="line.55"></a>
+<span class="sourceLineNo">056</span>     * @param cube A Cube object against which to build a query.<a name="line.56"></a>
+<span class="sourceLineNo">057</span>     * @throws SQLException If an error occurs while accessing the<a name="line.57"></a>
+<span class="sourceLineNo">058</span>     * cube's underlying connection.<a name="line.58"></a>
+<span class="sourceLineNo">059</span>     */<a name="line.59"></a>
+<span class="sourceLineNo">060</span>    public Query(String name, Cube cube) throws SQLException {<a name="line.60"></a>
+<span class="sourceLineNo">061</span>        super();<a name="line.61"></a>
+<span class="sourceLineNo">062</span>        this.name = name;<a name="line.62"></a>
+<span class="sourceLineNo">063</span>        this.cube = cube;<a name="line.63"></a>
+<span class="sourceLineNo">064</span>        final Catalog catalog = cube.getSchema().getCatalog();<a name="line.64"></a>
+<span class="sourceLineNo">065</span>        this.connection =<a name="line.65"></a>
+<span class="sourceLineNo">066</span>            catalog.getMetaData().getConnection().unwrap(OlapConnection.class);<a name="line.66"></a>
+<span class="sourceLineNo">067</span>        this.connection.setCatalog(catalog.getName());<a name="line.67"></a>
+<span class="sourceLineNo">068</span>        this.unused = new QueryAxis(this, null);<a name="line.68"></a>
+<span class="sourceLineNo">069</span>        for (Dimension dimension : cube.getDimensions()) {<a name="line.69"></a>
+<span class="sourceLineNo">070</span>            QueryDimension queryDimension = new QueryDimension(<a name="line.70"></a>
+<span class="sourceLineNo">071</span>                this, dimension);<a name="line.71"></a>
+<span class="sourceLineNo">072</span>            unused.getDimensions().add(queryDimension);<a name="line.72"></a>
+<span class="sourceLineNo">073</span>            dimensionMap.put(queryDimension.getName(), queryDimension);<a name="line.73"></a>
+<span class="sourceLineNo">074</span>        }<a name="line.74"></a>
+<span class="sourceLineNo">075</span>        across = new QueryAxis(this, Axis.COLUMNS);<a name="line.75"></a>
+<span class="sourceLineNo">076</span>        down = new QueryAxis(this, Axis.ROWS);<a name="line.76"></a>
+<span class="sourceLineNo">077</span>        filter = new QueryAxis(this, Axis.FILTER);<a name="line.77"></a>
+<span class="sourceLineNo">078</span>        axes.put(null, unused);<a name="line.78"></a>
+<span class="sourceLineNo">079</span>        axes.put(Axis.COLUMNS, across);<a name="line.79"></a>
+<span class="sourceLineNo">080</span>        axes.put(Axis.ROWS, down);<a name="line.80"></a>
+<span class="sourceLineNo">081</span>        axes.put(Axis.FILTER, filter);<a name="line.81"></a>
+<span class="sourceLineNo">082</span>    }<a name="line.82"></a>
+<span class="sourceLineNo">083</span><a name="line.83"></a>
+<span class="sourceLineNo">084</span>    /**<a name="line.84"></a>
+<span class="sourceLineNo">085</span>     * Returns the MDX parse tree behind this Query. The returned object is<a name="line.85"></a>
+<span class="sourceLineNo">086</span>     * generated for each call to this function. Altering the returned<a name="line.86"></a>
+<span class="sourceLineNo">087</span>     * SelectNode object won't affect the query itself.<a name="line.87"></a>
+<span class="sourceLineNo">088</span>     * @return A SelectNode object representing the current query structure.<a name="line.88"></a>
+<span class="sourceLineNo">089</span>     */<a name="line.89"></a>
+<span class="sourceLineNo">090</span>    public SelectNode getSelect() {<a name="line.90"></a>
+<span class="sourceLineNo">091</span>        return Olap4jNodeConverter.toOlap4j(this);<a name="line.91"></a>
+<span class="sourceLineNo">092</span>    }<a name="line.92"></a>
+<span class="sourceLineNo">093</span><a name="line.93"></a>
+<span class="sourceLineNo">094</span>    /**<a name="line.94"></a>
+<span class="sourceLineNo">095</span>     * Returns the underlying cube object that is used to query against.<a name="line.95"></a>
+<span class="sourceLineNo">096</span>     * @return The Olap4j's Cube object.<a name="line.96"></a>
+<span class="sourceLineNo">097</span>     */<a name="line.97"></a>
+<span class="sourceLineNo">098</span>    public Cube getCube() {<a name="line.98"></a>
+<span class="sourceLineNo">099</span>        return cube;<a name="line.99"></a>
+<span class="sourceLineNo">100</span>    }<a name="line.100"></a>
+<span class="sourceLineNo">101</span><a name="line.101"></a>
+<span class="sourceLineNo">102</span>    /**<a name="line.102"></a>
+<span class="sourceLineNo">103</span>     * Returns the Olap4j's Dimension object according to the name<a name="line.103"></a>
+<span class="sourceLineNo">104</span>     * given as a parameter. If no dimension of the given name is found,<a name="line.104"></a>
+<span class="sourceLineNo">105</span>     * a null value will be returned.<a name="line.105"></a>
+<span class="sourceLineNo">106</span>     * @param name The name of the dimension you want the object for.<a name="line.106"></a>
+<span class="sourceLineNo">107</span>     * @return The dimension object, null if no dimension of that<a name="line.107"></a>
+<span class="sourceLineNo">108</span>     * name can be found.<a name="line.108"></a>
+<span class="sourceLineNo">109</span>     */<a name="line.109"></a>
+<span class="sourceLineNo">110</span>    public QueryDimension getDimension(String name) {<a name="line.110"></a>
+<span class="sourceLineNo">111</span>        return dimensionMap.get(name);<a name="line.111"></a>
+<span class="sourceLineNo">112</span>    }<a name="line.112"></a>
+<span class="sourceLineNo">113</span><a name="line.113"></a>
+<span class="sourceLineNo">114</span>    /**<a name="line.114"></a>
+<span class="sourceLineNo">115</span>     * Swaps rows and columns axes. Only applicable if there are two axes.<a name="line.115"></a>
+<span class="sourceLineNo">116</span>     */<a name="line.116"></a>
+<span class="sourceLineNo">117</span>    public void swapAxes() {<a name="line.117"></a>
+<span class="sourceLineNo">118</span>        // Only applicable if there are two axes - plus filter and unused.<a name="line.118"></a>
+<span class="sourceLineNo">119</span>        if (axes.size() != 4) {<a name="line.119"></a>
+<span class="sourceLineNo">120</span>            throw new IllegalArgumentException();<a name="line.120"></a>
+<span class="sourceLineNo">121</span>        }<a name="line.121"></a>
+<span class="sourceLineNo">122</span>        List&lt;QueryDimension&gt; tmpAcross = new ArrayList&lt;QueryDimension&gt;();<a name="line.122"></a>
+<span class="sourceLineNo">123</span>        tmpAcross.addAll(across.getDimensions());<a name="line.123"></a>
+<span class="sourceLineNo">124</span><a name="line.124"></a>
+<span class="sourceLineNo">125</span>        List&lt;QueryDimension&gt; tmpDown = new ArrayList&lt;QueryDimension&gt;();<a name="line.125"></a>
+<span class="sourceLineNo">126</span>        tmpDown.addAll(down.getDimensions());<a name="line.126"></a>
+<span class="sourceLineNo">127</span><a name="line.127"></a>
+<span class="sourceLineNo">128</span>        across.getDimensions().clear();<a name="line.128"></a>
+<span class="sourceLineNo">129</span>        Map&lt;Integer, QueryNode&gt; acrossChildList =<a name="line.129"></a>
+<span class="sourceLineNo">130</span>            new HashMap&lt;Integer, QueryNode&gt;();<a name="line.130"></a>
+<span class="sourceLineNo">131</span>        for (int cpt = 0; cpt &lt; tmpAcross.size();cpt++) {<a name="line.131"></a>
+<span class="sourceLineNo">132</span>            acrossChildList.put(Integer.valueOf(cpt), tmpAcross.get(cpt));<a name="line.132"></a>
+<span class="sourceLineNo">133</span>        }<a name="line.133"></a>
+<span class="sourceLineNo">134</span>        across.notifyRemove(acrossChildList);<a name="line.134"></a>
+<span class="sourceLineNo">135</span><a name="line.135"></a>
+<span class="sourceLineNo">136</span>        down.getDimensions().clear();<a name="line.136"></a>
+<span class="sourceLineNo">137</span>        Map&lt;Integer, QueryNode&gt; downChildList =<a name="line.137"></a>
+<span class="sourceLineNo">138</span>            new HashMap&lt;Integer, QueryNode&gt;();<a name="line.138"></a>
+<span class="sourceLineNo">139</span>        for (int cpt = 0; cpt &lt; tmpDown.size();cpt++) {<a name="line.139"></a>
+<span class="sourceLineNo">140</span>            downChildList.put(Integer.valueOf(cpt), tmpDown.get(cpt));<a name="line.140"></a>
+<span class="sourceLineNo">141</span>        }<a name="line.141"></a>
+<span class="sourceLineNo">142</span>        down.notifyRemove(downChildList);<a name="line.142"></a>
+<span class="sourceLineNo">143</span><a name="line.143"></a>
+<span class="sourceLineNo">144</span>        across.getDimensions().addAll(tmpDown);<a name="line.144"></a>
+<span class="sourceLineNo">145</span>        across.notifyAdd(downChildList);<a name="line.145"></a>
+<span class="sourceLineNo">146</span><a name="line.146"></a>
+<span class="sourceLineNo">147</span>        down.getDimensions().addAll(tmpAcross);<a name="line.147"></a>
+<span class="sourceLineNo">148</span>        down.notifyAdd(acrossChildList);<a name="line.148"></a>
+<span class="sourceLineNo">149</span>    }<a name="line.149"></a>
+<span class="sourceLineNo">150</span><a name="line.150"></a>
+<span class="sourceLineNo">151</span>    /**<a name="line.151"></a>
+<span class="sourceLineNo">152</span>     * Returns the query axis for a given axis type.<a name="line.152"></a>
+<span class="sourceLineNo">153</span>     *<a name="line.153"></a>
+<span class="sourceLineNo">154</span>     * &lt;p&gt;If you pass axis=null, returns a special axis that is used to hold<a name="line.154"></a>
+<span class="sourceLineNo">155</span>     * all unused hierarchies. (We may change this behavior in future.)<a name="line.155"></a>
+<span class="sourceLineNo">156</span>     *<a name="line.156"></a>
+<span class="sourceLineNo">157</span>     * @param axis Axis type<a name="line.157"></a>
+<span class="sourceLineNo">158</span>     * @return Query axis<a name="line.158"></a>
+<span class="sourceLineNo">159</span>     */<a name="line.159"></a>
+<span class="sourceLineNo">160</span>    public QueryAxis getAxis(Axis axis) {<a name="line.160"></a>
+<span class="sourceLineNo">161</span>        return this.axes.get(axis);<a name="line.161"></a>
+<span class="sourceLineNo">162</span>    }<a name="line.162"></a>
+<span class="sourceLineNo">163</span><a name="line.163"></a>
+<span class="sourceLineNo">164</span>    /**<a name="line.164"></a>
+<span class="sourceLineNo">165</span>     * Returns a map of the current query's axis.<a name="line.165"></a>
+<span class="sourceLineNo">166</span>     * &lt;p&gt;Be aware that modifications to this list might<a name="line.166"></a>
+<span class="sourceLineNo">167</span>     * have unpredictable consequences.&lt;/p&gt;<a name="line.167"></a>
+<span class="sourceLineNo">168</span>     * @return A standard Map object that represents the<a name="line.168"></a>
+<span class="sourceLineNo">169</span>     * current query's axis.<a name="line.169"></a>
+<span class="sourceLineNo">170</span>     */<a name="line.170"></a>
+<span class="sourceLineNo">171</span>    public Map&lt;Axis, QueryAxis&gt; getAxes() {<a name="line.171"></a>
+<span class="sourceLineNo">172</span>        return axes;<a name="line.172"></a>
+<span class="sourceLineNo">173</span>    }<a name="line.173"></a>
+<span class="sourceLineNo">174</span><a name="line.174"></a>
+<span class="sourceLineNo">175</span>    /**<a name="line.175"></a>
+<span class="sourceLineNo">176</span>     * Returns the fictional axis into which all unused dimensions are stored.<a name="line.176"></a>
+<span class="sourceLineNo">177</span>     * All dimensions included in this axis will not be part of the query.<a name="line.177"></a>
+<span class="sourceLineNo">178</span>     * @return The QueryAxis representing dimensions that are currently not<a name="line.178"></a>
+<span class="sourceLineNo">179</span>     * used inside the query.<a name="line.179"></a>
+<span class="sourceLineNo">180</span>     */<a name="line.180"></a>
+<span class="sourceLineNo">181</span>    public QueryAxis getUnusedAxis() {<a name="line.181"></a>
+<span class="sourceLineNo">182</span>        return unused;<a name="line.182"></a>
+<span class="sourceLineNo">183</span>    }<a name="line.183"></a>
+<span class="sourceLineNo">184</span><a name="line.184"></a>
+<span class="sourceLineNo">185</span>    /**<a name="line.185"></a>
+<span class="sourceLineNo">186</span>     * Safely disposes of all underlying objects of this<a name="line.186"></a>
+<span class="sourceLineNo">187</span>     * query.<a name="line.187"></a>
+<span class="sourceLineNo">188</span>     * @param closeConnection Whether or not to call the<a name="line.188"></a>
+<span class="sourceLineNo">189</span>     * {@link OlapConnection#close()} method of the underlying<a name="line.189"></a>
+<span class="sourceLineNo">190</span>     * connection.<a name="line.190"></a>
+<span class="sourceLineNo">191</span>     */<a name="line.191"></a>
+<span class="sourceLineNo">192</span>    public void tearDown(boolean closeConnection) {<a name="line.192"></a>
+<span class="sourceLineNo">193</span>        for (Entry&lt;Axis, QueryAxis&gt; entry : this.axes.entrySet()) {<a name="line.193"></a>
+<span class="sourceLineNo">194</span>            entry.getValue().tearDown();<a name="line.194"></a>
+<span class="sourceLineNo">195</span>        }<a name="line.195"></a>
+<span class="sourceLineNo">196</span>        this.axes.clear();<a name="line.196"></a>
+<span class="sourceLineNo">197</span>        this.clearListeners();<a name="line.197"></a>
+<span class="sourceLineNo">198</span>        if (closeConnection) {<a name="line.198"></a>
+<span class="sourceLineNo">199</span>            try {<a name="line.199"></a>
+<span class="sourceLineNo">200</span>                this.connection.close();<a name="line.200"></a>
+<span class="sourceLineNo">201</span>            } catch (SQLException e) {<a name="line.201"></a>
+<span class="sourceLineNo">202</span>                e.printStackTrace();<a name="line.202"></a>
+<span class="sourceLineNo">203</span>            }<a name="line.203"></a>
+<span class="sourceLineNo">204</span>        }<a name="line.204"></a>
+<span class="sourceLineNo">205</span>    }<a name="line.205"></a>
+<span class="sourceLineNo">206</span><a name="line.206"></a>
+<span class="sourceLineNo">207</span>    /**<a name="line.207"></a>
+<span class="sourceLineNo">208</span>     * Safely disposes of all underlying objects of this<a name="line.208"></a>
+<span class="sourceLineNo">209</span>     * query and closes the underlying {@link OlapConnection}.<a name="line.209"></a>
+<span class="sourceLineNo">210</span>     * &lt;p&gt;Equivalent of calling Query.tearDown(true).<a name="line.210"></a>
+<span class="sourceLineNo">211</span>     */<a name="line.211"></a>
+<span class="sourceLineNo">212</span>    public void tearDown() {<a name="line.212"></a>
+<span class="sourceLineNo">213</span>        this.tearDown(true);<a name="line.213"></a>
+<span class="sourceLineNo">214</span>    }<a name="line.214"></a>
+<span class="sourceLineNo">215</span><a name="line.215"></a>
+<span class="sourceLineNo">216</span>    /**<a name="line.216"></a>
+<span class="sourceLineNo">217</span>     * Validates the current query structure. If a dimension axis has<a name="line.217"></a>
+<span class="sourceLineNo">218</span>     * been placed on an axis but no selections were performed on it,<a name="line.218"></a>
+<span class="sourceLineNo">219</span>     * the default hierarchy and default member will be selected. This<a name="line.219"></a>
+<span class="sourceLineNo">220</span>     * can be turned off by invoking the<a name="line.220"></a>
+<span class="sourceLineNo">221</span>     * {@link Query#setSelectDefaultMembers(boolean)} method.<a name="line.221"></a>
+<span class="sourceLineNo">222</span>     * @throws OlapException If the query is not valid, an exception<a name="line.222"></a>
+<span class="sourceLineNo">223</span>     * will be thrown and it's message will describe exactly what to fix.<a name="line.223"></a>
+<span class="sourceLineNo">224</span>     */<a name="line.224"></a>
+<span class="sourceLineNo">225</span>    public void validate() throws OlapException {<a name="line.225"></a>
+<span class="sourceLineNo">226</span>        try {<a name="line.226"></a>
+<span class="sourceLineNo">227</span>            // First, perform default selections if needed.<a name="line.227"></a>
+<span class="sourceLineNo">228</span>            if (this.selectDefaultMembers) {<a name="line.228"></a>
+<span class="sourceLineNo">229</span>                // Perform default selection on the dimensions on the rows axis.<a name="line.229"></a>
+<span class="sourceLineNo">230</span>                for (QueryDimension dimension : this.getAxis(Axis.ROWS)<a name="line.230"></a>
+<span class="sourceLineNo">231</span>                    .getDimensions())<a name="line.231"></a>
+<span class="sourceLineNo">232</span>                {<a name="line.232"></a>
+<span class="sourceLineNo">233</span>                    if (dimension.getInclusions().size() == 0) {<a name="line.233"></a>
+<span class="sourceLineNo">234</span>                        Member defaultMember = dimension.getDimension()<a name="line.234"></a>
+<span class="sourceLineNo">235</span>                            .getDefaultHierarchy().getDefaultMember();<a name="line.235"></a>
+<span class="sourceLineNo">236</span>                        dimension.include(defaultMember);<a name="line.236"></a>
+<span class="sourceLineNo">237</span>                    }<a name="line.237"></a>
+<span class="sourceLineNo">238</span>                }<a name="line.238"></a>
+<span class="sourceLineNo">239</span>                // Perform default selection on the<a name="line.239"></a>
+<span class="sourceLineNo">240</span>                // dimensions on the columns axis.<a name="line.240"></a>
+<span class="sourceLineNo">241</span>                for (QueryDimension dimension : this.getAxis(Axis.COLUMNS)<a name="line.241"></a>
+<span class="sourceLineNo">242</span>                    .getDimensions())<a name="line.242"></a>
+<span class="sourceLineNo">243</span>                {<a name="line.243"></a>
+<span class="sourceLineNo">244</span>                    if (dimension.getInclusions().size() == 0) {<a name="line.244"></a>
+<span class="sourceLineNo">245</span>                        Member defaultMember = dimension.getDimension()<a name="line.245"></a>
+<span class="sourceLineNo">246</span>                            .getDefaultHierarchy().getDefaultMember();<a name="line.246"></a>
+<span class="sourceLineNo">247</span>                        dimension.include(defaultMember);<a name="line.247"></a>
+<span class="sourceLineNo">248</span>                    }<a name="line.248"></a>
+<span class="sourceLineNo">249</span>                }<a name="line.249"></a>
+<span class="sourceLineNo">250</span>                // Perform default selection on the dimensions<a name="line.250"></a>
+<span class="sourceLineNo">251</span>                // on the filter axis.<a name="line.251"></a>
+<span class="sourceLineNo">252</span>                for (QueryDimension dimension : this.getAxis(Axis.FILTER)<a name="line.252"></a>
+<span class="sourceLineNo">253</span>                    .getDimensions())<a name="line.253"></a>
+<span class="sourceLineNo">254</span>                {<a name="line.254"></a>
+<span class="sourceLineNo">255</span>                    if (dimension.getInclusions().size() == 0) {<a name="line.255"></a>
+<span class="sourceLineNo">256</span>                        Member defaultMember = dimension.getDimension()<a name="line.256"></a>
+<span class="sourceLineNo">257</span>                            .getDefaultHierarchy().getDefaultMember();<a name="line.257"></a>
+<span class="sourceLineNo">258</span>                        dimension.include(defaultMember);<a name="line.258"></a>
+<span class="sourceLineNo">259</span>                    }<a name="line.259"></a>
+<span class="sourceLineNo">260</span>                }<a name="line.260"></a>
+<span class="sourceLineNo">261</span>            }<a name="line.261"></a>
+<span class="sourceLineNo">262</span><a name="line.262"></a>
+<span class="sourceLineNo">263</span>            // We at least need a dimension on the rows and on the columns axis.<a name="line.263"></a>
+<span class="sourceLineNo">264</span>            if (this.getAxis(Axis.ROWS).getDimensions().size() == 0) {<a name="line.264"></a>
+<span class="sourceLineNo">265</span>                throw new OlapException(<a name="line.265"></a>
+<span class="sourceLineNo">266</span>                    "A valid Query requires at least one dimension on the rows axis.");<a name="line.266"></a>
+<span class="sourceLineNo">267</span>            }<a name="line.267"></a>
+<span class="sourceLineNo">268</span>            if (this.getAxis(Axis.COLUMNS).getDimensions().size() == 0) {<a name="line.268"></a>
+<span class="sourceLineNo">269</span>                throw new OlapException(<a name="line.269"></a>
+<span class="sourceLineNo">270</span>                    "A valid Query requires at least one dimension on the columns axis.");<a name="line.270"></a>
+<span class="sourceLineNo">271</span>            }<a name="line.271"></a>
+<span class="sourceLineNo">272</span><a name="line.272"></a>
+<span class="sourceLineNo">273</span>            // Try to build a select tree.<a name="line.273"></a>
+<span class="sourceLineNo">274</span>            this.getSelect();<a name="line.274"></a>
+<span class="sourceLineNo">275</span>        } catch (Exception e) {<a name="line.275"></a>
+<span class="sourceLineNo">276</span>            throw new OlapException("Query validation failed.", e);<a name="line.276"></a>
+<span class="sourceLineNo">277</span>        }<a name="line.277"></a>
+<span class="sourceLineNo">278</span>    }<a name="line.278"></a>
+<span class="sourceLineNo">279</span><a name="line.279"></a>
+<span class="sourceLineNo">280</span>    /**<a name="line.280"></a>
+<span class="sourceLineNo">281</span>     * Executes the query against the current OlapConnection and returns<a name="line.281"></a>
+<span class="sourceLineNo">282</span>     * a CellSet object representation of the data.<a name="line.282"></a>
+<span class="sourceLineNo">283</span>     *<a name="line.283"></a>
+<span class="sourceLineNo">284</span>     * @return A proper CellSet object that represents the query execution<a name="line.284"></a>
+<span class="sourceLineNo">285</span>     *     results.<a name="line.285"></a>
+<span class="sourceLineNo">286</span>     * @throws OlapException If something goes sour, an OlapException will<a name="line.286"></a>
+<span class="sourceLineNo">287</span>     *     be thrown to the caller. It could be caused by many things, like<a name="line.287"></a>
+<span class="sourceLineNo">288</span>     *     a stale connection. Look at the root cause for more details.<a name="line.288"></a>
+<span class="sourceLineNo">289</span>     */<a name="line.289"></a>
+<span class="sourceLineNo">290</span>    public CellSet execute() throws OlapException {<a name="line.290"></a>
+<span class="sourceLineNo">291</span>        SelectNode mdx = getSelect();<a name="line.291"></a>
+<span class="sourceLineNo">292</span>        final Catalog catalog = cube.getSchema().getCatalog();<a name="line.292"></a>
+<span class="sourceLineNo">293</span>        try {<a name="line.293"></a>
+<span class="sourceLineNo">294</span>            this.connection.setCatalog(catalog.getName());<a name="line.294"></a>
+<span class="sourceLineNo">295</span>        } catch (SQLException e) {<a name="line.295"></a>
+<span class="sourceLineNo">296</span>            throw new OlapException("Error while executing query", e);<a name="line.296"></a>
+<span class="sourceLineNo">297</span>        }<a name="line.297"></a>
+<span class="sourceLineNo">298</span>        OlapStatement olapStatement = connection.createStatement();<a name="line.298"></a>
+<span class="sourceLineNo">299</span>        return olapStatement.executeOlapQuery(mdx);<a name="line.299"></a>
+<span class="sourceLineNo">300</span>    }<a name="line.300"></a>
+<span class="sourceLineNo">301</span><a name="line.301"></a>
+<span class="sourceLineNo">302</span>    /**<a name="line.302"></a>
+<span class="sourceLineNo">303</span>     * Returns this query's name. There is no guarantee that it is unique<a name="line.303"></a>
+<span class="sourceLineNo">304</span>     * and is set at object instanciation.<a name="line.304"></a>
+<span class="sourceLineNo">305</span>     * @return This query's name.<a name="line.305"></a>
+<span class="sourceLineNo">306</span>     */<a name="line.306"></a>
+<span class="sourceLineNo">307</span>    public String getName() {<a name="line.307"></a>
+<span class="sourceLineNo">308</span>        return name;<a name="line.308"></a>
+<span class="sourceLineNo">309</span>    }<a name="line.309"></a>
+<span class="sourceLineNo">310</span><a name="line.310"></a>
+<span class="sourceLineNo">311</span>    /**<a name="line.311"></a>
+<span class="sourceLineNo">312</span>     * Returns the current locale with which this query is expressed.<a name="line.312"></a>
+<span class="sourceLineNo">313</span>     * @return A standard Locale object.<a name="line.313"></a>
+<span class="sourceLineNo">314</span>     */<a name="line.314"></a>
+<span class="sourceLineNo">315</span>    public Locale getLocale() {<a name="line.315"></a>
+<span class="sourceLineNo">316</span>        // REVIEW Do queries really support locales?<a name="line.316"></a>
+<span class="sourceLineNo">317</span>        return Locale.getDefault();<a name="line.317"></a>
+<span class="sourceLineNo">318</span>    }<a name="line.318"></a>
+<span class="sourceLineNo">319</span><a name="line.319"></a>
+<span class="sourceLineNo">320</span>    /**<a name="line.320"></a>
+<span class="sourceLineNo">321</span>     * Package restricted method to access this query's selection factory.<a name="line.321"></a>
+<span class="sourceLineNo">322</span>     * Usually used by query dimensions who wants to perform selections.<a name="line.322"></a>
+<span class="sourceLineNo">323</span>     * @return The underlying SelectionFactory implementation.<a name="line.323"></a>
+<span class="sourceLineNo">324</span>     */<a name="line.324"></a>
+<span class="sourceLineNo">325</span>    SelectionFactory getSelectionFactory() {<a name="line.325"></a>
+<span class="sourceLineNo">326</span>        return selectionFactory;<a name="line.326"></a>
+<span class="sourceLineNo">327</span>    }<a name="line.327"></a>
+<span class="sourceLineNo">328</span><a name="line.328"></a>
+<span class="sourceLineNo">329</span>    /**<a name="line.329"></a>
+<span class="sourceLineNo">330</span>     * Behavior setter for a query. By default, if a dimension is placed on<a name="line.330"></a>
+<span class="sourceLineNo">331</span>     * an axis but no selections are made, the default hierarchy and<a name="line.331"></a>
+<span class="sourceLineNo">332</span>     * the default member will be selected when validating the query.<a name="line.332"></a>
+<span class="sourceLineNo">333</span>     * This behavior can be turned off by this setter.<a name="line.333"></a>
+<span class="sourceLineNo">334</span>     * @param selectDefaultMembers Enables or disables the default<a name="line.334"></a>
+<span class="sourceLineNo">335</span>     * member and hierarchy selection upon validation.<a name="line.335"></a>
+<span class="sourceLineNo">336</span>     */<a name="line.336"></a>
+<span class="sourceLineNo">337</span>    public void setSelectDefaultMembers(boolean selectDefaultMembers) {<a name="line.337"></a>
+<span class="sourceLineNo">338</span>        this.selectDefaultMembers = selectDefaultMembers;<a name="line.338"></a>
+<span class="sourceLineNo">339</span>    }<a name="line.339"></a>
+<span class="sourceLineNo">340</span>}<a name="line.340"></a>
+<span class="sourceLineNo">341</span><a name="line.341"></a>
+<span class="sourceLineNo">342</span>// End Query.java<a name="line.342"></a>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre>
+</div>
+</body>
+</html>

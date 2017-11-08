@@ -1,0 +1,11 @@
+org.olap4j
+org.olap4j.driver.xmla
+org.olap4j.driver.xmla.cache
+org.olap4j.driver.xmla.proxy
+org.olap4j.layout
+org.olap4j.mdx
+org.olap4j.mdx.parser
+org.olap4j.metadata
+org.olap4j.query
+org.olap4j.transform
+org.olap4j.type
